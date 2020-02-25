@@ -3,6 +3,7 @@ package redis
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -53,6 +54,14 @@ func NewGR(cnf *config.Config, addrs []string, db int) iface.Backend {
 
 	b.rclient = redis.NewUniversalClient(ropt)
 	return b
+}
+
+func (b *BackendGR) SaveGroup(group *tasks.GroupMeta) error {
+	return errors.New("not implemented")
+}
+
+func (b *BackendGR) GetGroupMeta(groupUUID string) (*tasks.GroupMeta, error) {
+	return nil, errors.New("not implemented")
 }
 
 // InitGroup creates and saves a group meta data object
