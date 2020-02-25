@@ -7,13 +7,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/RichardKnop/redsync"
+	"github.com/gomodule/redigo/redis"
+
 	"github.com/RichardKnop/machinery/v1/backends/iface"
 	"github.com/RichardKnop/machinery/v1/common"
 	"github.com/RichardKnop/machinery/v1/config"
 	"github.com/RichardKnop/machinery/v1/log"
 	"github.com/RichardKnop/machinery/v1/tasks"
-	"github.com/RichardKnop/redsync"
-	"github.com/gomodule/redigo/redis"
 )
 
 // Backend represents a Redis result backend
@@ -41,6 +42,26 @@ func New(cnf *config.Config, host, password, socketPath string, db int) iface.Ba
 	}
 }
 
+// TODO: should eventually be an interface func and implemented in all Backends
+func (b *Backend) SaveGroup(g *tasks.GroupMeta) error {
+	// TODO: validate required args
+	encoded, err := json.Marshal(g)
+	if err != nil {
+		return err
+	}
+
+	conn := b.Open()
+	defer conn.Close()
+
+	_, err = conn.Do("SET", g.GroupUUID, encoded)
+	if err != nil {
+		return err
+	}
+
+	// TODO: could be a setex to reduce trips (requires >= Redis 2.0)
+	return b.setExpirationTime(g.GroupUUID)
+}
+
 // InitGroup creates and saves a group meta data object
 func (b *Backend) InitGroup(groupUUID string, taskUUIDs []string) error {
 	groupMeta := &tasks.GroupMeta{
@@ -54,7 +75,7 @@ func (b *Backend) InitGroup(groupUUID string, taskUUIDs []string) error {
 		return err
 	}
 
-	conn := b.open()
+	conn := b.Open()
 	defer conn.Close()
 
 	_, err = conn.Do("SET", groupUUID, encoded)
@@ -67,7 +88,7 @@ func (b *Backend) InitGroup(groupUUID string, taskUUIDs []string) error {
 
 // GroupCompleted returns true if all tasks in a group finished
 func (b *Backend) GroupCompleted(groupUUID string, groupTaskCount int) (bool, error) {
-	groupMeta, err := b.getGroupMeta(groupUUID)
+	groupMeta, err := b.GetGroupMeta(groupUUID)
 	if err != nil {
 		return false, err
 	}
@@ -88,8 +109,8 @@ func (b *Backend) GroupCompleted(groupUUID string, groupTaskCount int) (bool, er
 }
 
 // GroupTaskStates returns states of all tasks in the group
-func (b *Backend) GroupTaskStates(groupUUID string, groupTaskCount int) ([]*tasks.TaskState, error) {
-	groupMeta, err := b.getGroupMeta(groupUUID)
+func (b *Backend) GroupTaskStates(groupUUID string, _ int) ([]*tasks.TaskState, error) {
+	groupMeta, err := b.GetGroupMeta(groupUUID)
 	if err != nil {
 		return []*tasks.TaskState{}, err
 	}
@@ -102,7 +123,7 @@ func (b *Backend) GroupTaskStates(groupUUID string, groupTaskCount int) ([]*task
 // whether the worker should trigger chord (true) or no if it has been triggered
 // already (false)
 func (b *Backend) TriggerChord(groupUUID string) (bool, error) {
-	conn := b.open()
+	conn := b.Open()
 	defer conn.Close()
 
 	m := b.redsync.NewMutex("TriggerChordMutex")
@@ -111,7 +132,7 @@ func (b *Backend) TriggerChord(groupUUID string) (bool, error) {
 	}
 	defer m.Unlock()
 
-	groupMeta, err := b.getGroupMeta(groupUUID)
+	groupMeta, err := b.GetGroupMeta(groupUUID)
 	if err != nil {
 		return false, err
 	}
@@ -189,7 +210,7 @@ func (b *Backend) SetStateFailure(signature *tasks.Signature, err string) error 
 
 // GetState returns the latest task state
 func (b *Backend) GetState(taskUUID string) (*tasks.TaskState, error) {
-	conn := b.open()
+	conn := b.Open()
 	defer conn.Close()
 
 	item, err := redis.Bytes(conn.Do("GET", taskUUID))
@@ -208,7 +229,7 @@ func (b *Backend) GetState(taskUUID string) (*tasks.TaskState, error) {
 
 // PurgeState deletes stored task state
 func (b *Backend) PurgeState(taskUUID string) error {
-	conn := b.open()
+	conn := b.Open()
 	defer conn.Close()
 
 	_, err := conn.Do("DEL", taskUUID)
@@ -221,7 +242,7 @@ func (b *Backend) PurgeState(taskUUID string) error {
 
 // PurgeGroupMeta deletes stored group meta data
 func (b *Backend) PurgeGroupMeta(groupUUID string) error {
-	conn := b.open()
+	conn := b.Open()
 	defer conn.Close()
 
 	_, err := conn.Do("DEL", groupUUID)
@@ -232,9 +253,10 @@ func (b *Backend) PurgeGroupMeta(groupUUID string) error {
 	return nil
 }
 
-// getGroupMeta retrieves group meta data, convenience function to avoid repetition
-func (b *Backend) getGroupMeta(groupUUID string) (*tasks.GroupMeta, error) {
-	conn := b.open()
+// GetGroupMeta retrieves group meta data, convenience function to avoid repetition
+// TODO: should be interface func and implement on all backends
+func (b *Backend) GetGroupMeta(groupUUID string) (*tasks.GroupMeta, error) {
+	conn := b.Open()
 	defer conn.Close()
 
 	item, err := redis.Bytes(conn.Do("GET", groupUUID))
@@ -252,11 +274,20 @@ func (b *Backend) getGroupMeta(groupUUID string) (*tasks.GroupMeta, error) {
 	return groupMeta, nil
 }
 
+// Open returns or creates instance of Redis connection
+func (b *Backend) Open() redis.Conn {
+	b.redisOnce.Do(func() {
+		b.pool = b.NewPool(b.socketPath, b.host, b.password, b.db, b.GetConfig().Redis, b.GetConfig().TLSConfig)
+		b.redsync = redsync.New([]redsync.Pool{b.pool})
+	})
+	return b.pool.Get()
+}
+
 // getStates returns multiple task states
 func (b *Backend) getStates(taskUUIDs ...string) ([]*tasks.TaskState, error) {
 	taskStates := make([]*tasks.TaskState, len(taskUUIDs))
 
-	conn := b.open()
+	conn := b.Open()
 	defer conn.Close()
 
 	// conn.Do requires []interface{}... can't pass []string unfortunately
@@ -292,7 +323,7 @@ func (b *Backend) getStates(taskUUIDs ...string) ([]*tasks.TaskState, error) {
 
 // updateState saves current task state
 func (b *Backend) updateState(taskState *tasks.TaskState) error {
-	conn := b.open()
+	conn := b.Open()
 	defer conn.Close()
 
 	encoded, err := json.Marshal(taskState)
@@ -317,7 +348,7 @@ func (b *Backend) setExpirationTime(key string) error {
 	}
 	expirationTimestamp := int32(time.Now().Unix() + int64(expiresIn))
 
-	conn := b.open()
+	conn := b.Open()
 	defer conn.Close()
 
 	_, err := conn.Do("EXPIREAT", key, expirationTimestamp)
@@ -326,13 +357,4 @@ func (b *Backend) setExpirationTime(key string) error {
 	}
 
 	return nil
-}
-
-// open returns or creates instance of Redis connection
-func (b *Backend) open() redis.Conn {
-	b.redisOnce.Do(func() {
-		b.pool = b.NewPool(b.socketPath, b.host, b.password, b.db, b.GetConfig().Redis, b.GetConfig().TLSConfig)
-		b.redsync = redsync.New([]redsync.Pool{b.pool})
-	})
-	return b.pool.Get()
 }

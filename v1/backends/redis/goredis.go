@@ -232,7 +232,7 @@ func (b *BackendGR) PurgeGroupMeta(groupUUID string) error {
 	return nil
 }
 
-// getGroupMeta retrieves group meta data, convenience function to avoid repetition
+// GetGroupMeta retrieves group meta data, convenience function to avoid repetition
 func (b *BackendGR) getGroupMeta(groupUUID string) (*tasks.GroupMeta, error) {
 	item, err := b.rclient.Get(groupUUID).Bytes()
 	if err != nil {

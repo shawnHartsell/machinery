@@ -36,6 +36,8 @@ type GroupMeta struct {
 	ChordTriggered bool      `bson:"chord_triggered"`
 	Lock           bool      `bson:"lock"`
 	CreatedAt      time.Time `bson:"created_at"`
+	// Bag of additional data that clients can add
+	AdditionalData map[string]interface{}
 }
 
 // NewPendingTaskState ...
