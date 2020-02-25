@@ -46,6 +46,14 @@ func New(cnf *config.Config) iface.Backend {
 	return backend
 }
 
+func (b *Backend) SaveGroup(group *tasks.GroupMeta) error {
+	return errors.New("not implemented")
+}
+
+func (b *Backend) GetGroupMeta(groupUUID string) (*tasks.GroupMeta, error) {
+	return nil, errors.New("not implemented")
+}
+
 // InitGroup ...
 func (b *Backend) InitGroup(groupUUID string, taskUUIDs []string) error {
 	meta := tasks.GroupMeta{

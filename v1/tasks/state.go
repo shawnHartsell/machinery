@@ -37,7 +37,7 @@ type GroupMeta struct {
 	Lock           bool      `bson:"lock"`
 	CreatedAt      time.Time `bson:"created_at"`
 	// Bag of additional data that clients can add
-	AdditionalData map[string]interface{}
+	AdditionalData map[string]interface{} `bson:"additional_data"`
 }
 
 // NewPendingTaskState ...

@@ -11,6 +11,8 @@ type Backend interface {
 	GroupCompleted(groupUUID string, groupTaskCount int) (bool, error)
 	GroupTaskStates(groupUUID string, groupTaskCount int) ([]*tasks.TaskState, error)
 	TriggerChord(groupUUID string) (bool, error)
+	SaveGroup(group *tasks.GroupMeta) error
+	GetGroupMeta(groupUUID string) (*tasks.GroupMeta, error)
 
 	// Setting / getting task state
 	SetStatePending(signature *tasks.Signature) error

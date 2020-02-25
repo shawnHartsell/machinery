@@ -3,6 +3,7 @@ package memcache
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/RichardKnop/machinery/v1/backends/iface"
@@ -27,6 +28,14 @@ func New(cnf *config.Config, servers []string) iface.Backend {
 		Backend: common.NewBackend(cnf),
 		servers: servers,
 	}
+}
+
+func (b *Backend) SaveGroup(group *tasks.GroupMeta) error {
+	return errors.New("not implemented")
+}
+
+func (b *Backend) GetGroupMeta(groupUUID string) (*tasks.GroupMeta, error) {
+	return nil, errors.New("not implemented")
 }
 
 // InitGroup creates and saves a group meta data object

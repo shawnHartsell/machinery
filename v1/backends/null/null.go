@@ -1,6 +1,7 @@
 package null
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/RichardKnop/machinery/v1/backends/iface"
@@ -51,6 +52,14 @@ func New() iface.Backend {
 		Backend: common.NewBackend(new(config.Config)),
 		groups:  make(map[string]struct{}),
 	}
+}
+
+func (b *Backend) SaveGroup(group *tasks.GroupMeta) error {
+	return errors.New("not implemented")
+}
+
+func (b *Backend) GetGroupMeta(groupUUID string) (*tasks.GroupMeta, error) {
+	return nil, errors.New("not implemented")
 }
 
 // InitGroup creates and saves a group meta data object

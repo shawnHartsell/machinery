@@ -39,6 +39,14 @@ func New(cnf *config.Config) iface.Backend {
 	return &Backend{Backend: common.NewBackend(cnf), AMQPConnector: common.AMQPConnector{}}
 }
 
+func (b *Backend) SaveGroup(group *tasks.GroupMeta) error {
+	return errors.New("not implemented")
+}
+
+func (b *Backend) GetGroupMeta(groupUUID string) (*tasks.GroupMeta, error) {
+	return nil, errors.New("not implemented")
+}
+
 // InitGroup creates and saves a group meta data object
 func (b *Backend) InitGroup(groupUUID string, taskUUIDs []string) error {
 	return nil
