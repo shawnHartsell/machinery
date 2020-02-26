@@ -121,7 +121,7 @@ func (b *Backend) GroupTaskStates(groupUUID string, _ int) ([]*tasks.TaskState, 
 // TriggerChord flags chord as triggered in the backend storage to make sure
 // chord is never trigerred multiple times. Returns a boolean flag to indicate
 // whether the worker should trigger chord (true) or no if it has been triggered
-// already (false)
+// already (false).
 func (b *Backend) TriggerChord(groupUUID string) (bool, error) {
 	conn := b.Open()
 	defer conn.Close()
