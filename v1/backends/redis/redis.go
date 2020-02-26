@@ -164,6 +164,8 @@ func (b *Backend) mergeNewTaskState(newState *tasks.TaskState) {
 	if err == nil {
 		newState.CreatedAt = state.CreatedAt
 		newState.TaskName = state.TaskName
+		newState.CompletedOn = state.CompletedOn
+		newState.Retries += state.Retries
 	}
 }
 
