@@ -3,6 +3,7 @@ package eager
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -57,6 +58,14 @@ func New() iface.Backend {
 		groups:  make(map[string][]string),
 		tasks:   make(map[string][]byte),
 	}
+}
+
+func (b *Backend) SaveGroup(group *tasks.GroupMeta) error {
+	return errors.New("not implemented")
+}
+
+func (b *Backend) GetGroupMeta(groupUUID string) (*tasks.GroupMeta, error) {
+	return nil, errors.New("not implemented")
 }
 
 // InitGroup creates and saves a group meta data object

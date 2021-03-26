@@ -19,12 +19,15 @@ const (
 
 // TaskState represents a state of a task
 type TaskState struct {
-	TaskUUID  string        `bson:"_id"`
-	TaskName  string        `bson:"task_name"`
-	State     string        `bson:"state"`
-	Results   []*TaskResult `bson:"results"`
-	Error     string        `bson:"error"`
-	CreatedAt time.Time     `bson:"created_at"`
+	TaskUUID         string        `bson:"_id"`
+	TaskName         string        `bson:"task_name"`
+	State            string        `bson:"state"`
+	Results          []*TaskResult `bson:"results"`
+	Error            string        `bson:"error"`
+	CreatedAt        time.Time     `bson:"created_at"`
+	CompletedOn      time.Time     `bson:"completed_on"`
+	Retries          int           `bson:"retries"`
+	RetriesRemaining int           `bson:"retries_remaining"`
 }
 
 // GroupMeta stores useful metadata about tasks within the same group
@@ -32,10 +35,13 @@ type TaskState struct {
 // completed successfully or not and thus whether to trigger chord callback
 type GroupMeta struct {
 	GroupUUID      string    `bson:"_id"`
+	GroupName      string    `bson:"name"`
 	TaskUUIDs      []string  `bson:"task_uuids"`
 	ChordTriggered bool      `bson:"chord_triggered"`
 	Lock           bool      `bson:"lock"`
 	CreatedAt      time.Time `bson:"created_at"`
+	// Bag of additional data that clients can add
+	AdditionalData map[string]interface{} `bson:"additional_data"`
 }
 
 // NewPendingTaskState ...
@@ -67,18 +73,20 @@ func NewStartedTaskState(signature *Signature) *TaskState {
 // NewSuccessTaskState ...
 func NewSuccessTaskState(signature *Signature, results []*TaskResult) *TaskState {
 	return &TaskState{
-		TaskUUID: signature.UUID,
-		State:    StateSuccess,
-		Results:  results,
+		TaskUUID:    signature.UUID,
+		State:       StateSuccess,
+		Results:     results,
+		CompletedOn: time.Now().UTC(),
 	}
 }
 
 // NewFailureTaskState ...
 func NewFailureTaskState(signature *Signature, err string) *TaskState {
 	return &TaskState{
-		TaskUUID: signature.UUID,
-		State:    StateFailure,
-		Error:    err,
+		TaskUUID:    signature.UUID,
+		State:       StateFailure,
+		Error:       err,
+		CompletedOn: time.Now().UTC(),
 	}
 }
 
@@ -87,6 +95,10 @@ func NewRetryTaskState(signature *Signature) *TaskState {
 	return &TaskState{
 		TaskUUID: signature.UUID,
 		State:    StateRetry,
+		Retries:  1,
+		// This is a bit of a hack b/c it relies on the fact that the RetryCount field is deprecated in the worker
+		// when an error occurs. Could be more explicit if we added a MaxRetries field on the TaskState and then decrement here
+		RetriesRemaining: signature.RetryCount,
 	}
 }
 
@@ -103,5 +115,5 @@ func (taskState *TaskState) IsSuccess() bool {
 
 // IsFailure returns true if state is FAILURE
 func (taskState *TaskState) IsFailure() bool {
-	return taskState.State == StateFailure
+	return taskState.State == StateFailure && taskState.RetriesRemaining == 0
 }
